@@ -15,7 +15,6 @@ jobs:
       - name: 📥 Checkout Code (Required for Full History)
         uses: actions/checkout@v4
         with:
-          # CRITICAL: Needed for accurate SonarCloud New Code analysis and PR decoration.
           fetch-depth: 0 
 
       - name: 🛠️ Setup Java 17 (Required for SonarScanner)
@@ -35,38 +34,35 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} 
         run: |
           dotnet tool install --global dotnet-sonarscanner
-          
-          # FIX 1: Removed angle brackets from keys
-          # Ensure your keys match your SonarCloud organization and chosen project key exactly.
+
           dotnet sonarscanner begin \
-          /k:"R-AMARNATH_CSD-CA-2-CI_CD" \
-          /o:"r-amarnath" \
-          /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
-          /d:sonar.host.url="https://sonarcloud.io" \
-          /d:sonar.cs.opencover.reportsPaths="**/coverage*.xml"
+            /k:"R-AMARNATH_CSD-CA-2-CI_CD" \
+            /o:"r-amarnath" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.cs.opencover.reportsPaths="coverage/*.xml"
 
-
-      # --- 2. RESTORE, BUILD, AND TEST (Monitored by Scanner) ---
+      # --- 2. RESTORE, BUILD, AND TEST ---
       - name: 📦 Restore Dependencies
         run: dotnet restore
 
       - name: 🏗️ Build Project
         run: dotnet build --configuration Release --no-restore
-        
+
+      # ✅ Run Unit Tests and Collect Cobertura Coverage
       - name: ✅ Run Unit Tests and Collect Coverage
-        # If this step fails, the pipeline will stop, preventing the 'end' command from running.
         run: |
+          mkdir -p coverage
           dotnet test \
             --no-build \
             --configuration Release \
             /p:CollectCoverage=true \
-            /p:CoverletOutputFormat=opencover \
-            /p:CoverletOutput=coverage/coverage.xml
+            /p:CoverletOutput=coverage/ \
+            /p:CoverletOutputFormat=cobertura
 
-      # --- 3. END SONAR SCAN (Upload only) ---
+      # --- 3. END SONAR SCAN ---
       - name: 📤 End SonarCloud Scan and Upload Results
-        # 'if: always()' is still crucial here.
-        if: always() 
+        if: always()
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
