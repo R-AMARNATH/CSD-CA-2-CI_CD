@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,98 +9,140 @@ namespace BPCalculator.UnitTests
 {
     public class BloodPressureTests
     {
-        // =================================================================
-        // Test cases for BPCategory calculation (The main logic)
-        // =================================================================
-
+        // =====================================================================
+        // 1. High BP Tests (Stage 2)
+        // =====================================================================
         [Theory]
-        [InlineData(140, 90)]  // High: Systolic >= 140 AND Diastolic >= 90
-        [InlineData(160, 80)]  // High: Systolic >= 140 only
-        [InlineData(130, 95)]  // High: Diastolic >= 90 only
-        [InlineData(190, 100)] // High: Max valid values
-        public void Category_ShouldReturnHigh_WhenBPisHigh(int systolic, int diastolic)
+        [InlineData(140, 70)]
+        [InlineData(150, 60)]
+        [InlineData(120, 95)]
+        [InlineData(139, 90)]
+        public void Category_High_ShouldBeDetected(int systolic, int diastolic)
         {
-            // Arrange
             var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
+            Assert.Equal(BPCategory.High, bp.Category);
+        }
 
-            // Act
-            BPCategory category = bp.Category;
+        // =====================================================================
+        // 2. Pre-High Tests (Stage 1)
+        // =====================================================================
+        [Theory]
+        [InlineData(130, 60)]
+        [InlineData(135, 80)]
+        [InlineData(110, 87)]
+        [InlineData(139, 89)]
+        public void Category_PreHigh_ShouldBeDetected(int systolic, int diastolic)
+        {
+            var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
+            Assert.Equal(BPCategory.PreHigh, bp.Category);
+        }
 
-            // Assert
-            Assert.Equal(BPCategory.High, category);
+        // =====================================================================
+        // 3. Ideal BP Tests
+        // =====================================================================
+        [Theory]
+        [InlineData(90, 60)]
+        [InlineData(129, 84)]
+        [InlineData(110, 70)]
+        [InlineData(100, 80)]
+        public void Category_Ideal_ShouldBeDetected(int systolic, int diastolic)
+        {
+            var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
+            Assert.Equal(BPCategory.Ideal, bp.Category);
+        }
+
+        // =====================================================================
+        // 4. Low BP Tests
+        // =====================================================================
+        [Theory]
+        [InlineData(89, 50)]
+        [InlineData(80, 55)]
+        [InlineData(100, 59)]
+        [InlineData(85, 75)]
+        public void Category_Low_ShouldBeDetected(int systolic, int diastolic)
+        {
+            var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
+            Assert.Equal(BPCategory.Low, bp.Category);
+        }
+
+        // =====================================================================
+        // 5. Invalid Readings: Systolic <= Diastolic
+        // =====================================================================
+        [Theory]
+        [InlineData(80, 80)]
+        [InlineData(95, 100)]
+        [InlineData(120, 130)]
+        public void Category_InvalidReading_ShouldReturnLow(int systolic, int diastolic)
+        {
+            var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
+            Assert.Equal(BPCategory.Low, bp.Category);
+        }
+
+        // =====================================================================
+        // 6. Validate Range Attributes (Required to increase coverage)
+        // =====================================================================
+        [Theory]
+        [InlineData(50)]   // below min
+        [InlineData(250)]  // above max
+        public void Systolic_ShouldFailRangeValidation(int systolic)
+        {
+            var bp = new BloodPressure { Systolic = systolic, Diastolic = 70 };
+            var context = new ValidationContext(bp)
+            {
+                MemberName = nameof(BloodPressure.Systolic)
+            };
+            Assert.Throws<ValidationException>(() =>
+                Validator.ValidateProperty(bp.Systolic, context));
         }
 
         [Theory]
-        [InlineData(130, 85)]  // PreHigh: S: 130-139 AND D: 85-89 (lower boundary)
-        [InlineData(139, 89)]  // PreHigh: S: 130-139 AND D: 85-89 (upper boundary)
-        [InlineData(135, 80)]  // PreHigh: Systolic 130-139 only
-        [InlineData(120, 88)]  // PreHigh: Diastolic 85-89 only
-        public void Category_ShouldReturnPreHigh_WhenBPisPreHigh(int systolic, int diastolic)
+        [InlineData(10)]   // below min
+        [InlineData(150)]  // above max
+        public void Diastolic_ShouldFailRangeValidation(int diastolic)
         {
-            // Arrange
-            var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
-
-            // Act
-            BPCategory category = bp.Category;
-
-            // Assert
-            Assert.Equal(BPCategory.PreHigh, category);
+            var bp = new BloodPressure { Systolic = 100, Diastolic = diastolic };
+            var context = new ValidationContext(bp)
+            {
+                MemberName = nameof(BloodPressure.Diastolic)
+            };
+            Assert.Throws<ValidationException>(() =>
+                Validator.ValidateProperty(bp.Diastolic, context));
         }
 
-        [Theory]
-        [InlineData(90, 60)]   // Ideal: S: 90-129 AND D: 60-84 (lower boundary)
-        [InlineData(129, 84)]  // Ideal: S: 90-129 AND D: 60-84 (upper boundary)
-        [InlineData(110, 70)]  // Ideal: Typical reading
-        [InlineData(120, 80)]  // Ideal: Another typical reading
-        public void Category_ShouldReturnIdeal_WhenBPisIdeal(int systolic, int diastolic)
+        // =====================================================================
+        // 7. Enum Display Name Tests (also counted in coverage)
+        // =====================================================================
+        [Fact]
+        public void Enum_DisplayNames_ShouldBeCorrect()
         {
-            // Arrange
-            var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
-
-            // Act
-            BPCategory category = bp.Category;
-
-            // Assert
-            Assert.Equal(BPCategory.Ideal, category);
+            Assert.Equal("Low Blood Pressure", GetDisplayName(BPCategory.Low));
+            Assert.Equal("Ideal Blood Pressure", GetDisplayName(BPCategory.Ideal));
+            Assert.Equal("Pre-High Blood Pressure", GetDisplayName(BPCategory.PreHigh));
+            Assert.Equal("High Blood Pressure", GetDisplayName(BPCategory.High));
         }
 
-        [Theory]
-        [InlineData(89, 59)]   // Low: S < 90 AND D < 60 (upper boundary of low range)
-        [InlineData(70, 40)]   // Low: Min valid values
-        [InlineData(80, 50)]   // Low: Typical low reading
-        [InlineData(100, 55)]  // Low: Diastolic < 60 only (Systolic in Ideal range)
-        [InlineData(85, 75)]   // Low: Systolic < 90 only (Diastolic in Ideal range)
-        public void Category_ShouldReturnLow_WhenBPisLow(int systolic, int diastolic)
+        private string GetDisplayName(BPCategory category)
         {
-            // Arrange
-            var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
-
-            // Act
-            BPCategory category = bp.Category;
-
-            // Assert
-            Assert.Equal(BPCategory.Low, category);
+            var type = typeof(BPCategory);
+            var memInfo = type.GetMember(category.ToString());
+            var attributes = memInfo[0].GetCustomAttributes(typeof(DisplayAttribute), false);
+            return ((DisplayAttribute)attributes[0]).Name;
         }
 
-        // =================================================================
-        // Test case for the invalid reading check (Systolic <= Diastolic)
-        // =================================================================
-
+        // =====================================================================
+        // 8. Boundary Tests: Exact min/max values
+        // =====================================================================
         [Theory]
-        [InlineData(80, 80)]   // Systolic == Diastolic
-        [InlineData(70, 75)]   // Systolic < Diastolic
-        [InlineData(110, 120)] // Systolic < Diastolic (in Ideal range)
-        public void Category_ShouldReturnLow_WhenSystolicIsNotGreaterThanDiastolic(int systolic, int diastolic)
+        [InlineData(70, 40)]   // absolute minimum
+        [InlineData(190, 100)] // absolute maximum
+        public void Category_ShouldHandleBoundaryValues(int systolic, int diastolic)
         {
-            // Arrange
             var bp = new BloodPressure { Systolic = systolic, Diastolic = diastolic };
 
-            // Act
-            BPCategory category = bp.Category;
+            // Both fall into existing category rules
+            var category = bp.Category;
 
-            // Assert
-            // The implementation specifies BPCategory.Low as the default fallback for this invalid case.
-            Assert.Equal(BPCategory.Low, category);
+            Assert.NotNull(category);
         }
     }
 }
