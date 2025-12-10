@@ -16,12 +16,36 @@ jobs:
         # This action fetches your repository code
         uses: actions/checkout@v4
 
+      - name: 🛠️ Setup Java 17 (Required for SonarScanner)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: 🛠️ Setup .NET 9 SDK
         # The actions/setup-dotnet action installs the specified SDK version.
         uses: actions/setup-dotnet@v4
         with:
           # Specify .NET 9.x to get the latest stable version of 9.
           dotnet-version: '9.x'
+
+      # ... after Setup .NET 9 SDK ...
+      
+      - name: 🚀 Install & Begin SonarCloud Scan
+        env:
+          # The token is read securely from your repository secrets
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} 
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          
+          # Replace <YOUR_PROJECT_KEY> and <YOUR_ORGANIZATION_KEY>
+          dotnet sonarscanner begin \
+            /k:"<r-amarnath_ca2_dotnet_app>" \
+            /o:"<r-amarnath>" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.cs.opencover.reportsPaths="coverage/coverage.xml"
+            # The last line tells the scanner where to find the coverage report later.
 
       - name: 📦 Restore Dependencies
         # Runs 'dotnet restore' to download all NuGet package dependencies
@@ -32,11 +56,27 @@ jobs:
         # since we already ran 'dotnet restore' in the previous step.
         run: dotnet build --configuration Release --no-restore
         
-      - name: ✅ Run Unit Tests
-        # Runs 'dotnet test'. It executes tests in any project reference 
-        # that includes a testing package (like xUnit, NUnit, or MSTest).
-        # It is critical that this step returns a non-zero exit code on test failure.
-        run: dotnet test --configuration Release --no-build
+      - name: ✅ Run Unit Tests and Collect Coverage
+        # This is the monitored test step. It produces the 'coverage.xml' file.
+        run: |
+          dotnet test \
+            --no-build \
+            --configuration Release \
+            /p:CollectCoverage=true \
+            /p:CoverletOutputFormat=opencover \
+            /p:CoverletOutput=coverage/coverage.xml
+
+      - name: 📤 End SonarCloud Scan and Upload Results
+        # CRITICAL: 'if: always()' ensures the data is uploaded even if 'dotnet test' fails.
+        if: always() 
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+      
+      - name: 🛡️ Check Quality Gate Status
+        # Use this action to make the GitHub workflow fail if the SonarCloud Quality Gate fails
+        if: success() || failure()
+        uses: SonarSource/sonarcloud-quality-gate-action@v1.2.0
         
       # You can add steps here for publishing artifacts or deployment 
       # once the build and test steps pass.
