@@ -1,0 +1,42 @@
+name: .NET CI Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest # Using a standard Linux runner
+
+    steps:
+      - name: 📥 Checkout Code
+        # This action fetches your repository code
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup .NET 9 SDK
+        # The actions/setup-dotnet action installs the specified SDK version.
+        uses: actions/setup-dotnet@v4
+        with:
+          # Specify .NET 9.x to get the latest stable version of 9.
+          dotnet-version: '9.x'
+
+      - name: 📦 Restore Dependencies
+        # Runs 'dotnet restore' to download all NuGet package dependencies
+        run: dotnet restore
+
+      - name: 🏗️ Build Project
+        # Runs 'dotnet build'. The '--no-restore' flag speeds up the process 
+        # since we already ran 'dotnet restore' in the previous step.
+        run: dotnet build --configuration Release --no-restore
+        
+      - name: ✅ Run Unit Tests
+        # Runs 'dotnet test'. It executes tests in any project reference 
+        # that includes a testing package (like xUnit, NUnit, or MSTest).
+        # It is critical that this step returns a non-zero exit code on test failure.
+        run: dotnet test --configuration Release --no-build
+        
+      # You can add steps here for publishing artifacts or deployment 
+      # once the build and test steps pass.
