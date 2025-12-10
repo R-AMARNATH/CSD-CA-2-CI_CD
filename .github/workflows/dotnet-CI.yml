@@ -39,11 +39,12 @@ jobs:
           # FIX 1: Removed angle brackets from keys
           # Ensure your keys match your SonarCloud organization and chosen project key exactly.
           dotnet sonarscanner begin \
-            /k:"R-AMARNATH_CSD-CA-2-CI_CD" \
-            /o:"r-amarnath" \
-            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
-            /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.cs.opencover.reportsPaths="coverage/coverage.xml"
+          /k:"R-AMARNATH_CSD-CA-2-CI_CD" \
+          /o:"r-amarnath" \
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.cs.opencover.reportsPaths="**/coverage*.xml"
+
 
       # --- 2. RESTORE, BUILD, AND TEST (Monitored by Scanner) ---
       - name: 📦 Restore Dependencies
