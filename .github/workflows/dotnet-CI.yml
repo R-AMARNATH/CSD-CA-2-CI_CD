@@ -1,4 +1,4 @@
-name: SonarCloud
+name: CI/CD Pipeline
 
 on:
   push:
@@ -10,10 +10,11 @@ on:
     branches:
       - main
       - develop
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build, Test and Analyze
+  build-and-analyze:
+    name: Build, Test, SonarCloud Analysis
     runs-on: ubuntu-latest
 
     steps:
@@ -63,7 +64,8 @@ jobs:
             /o:"r-amarnath" \
             /d:sonar.token="${SONAR_TOKEN}" \
             /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
+            /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml" \
+            /d:sonar.coverage.exclusions="**/Program.cs,**/Startup.cs,**/Pages/*.cs,**/Pages/*.cshtml,**/performance.js"
 
       - name: Build solution
         run: dotnet build --configuration Release
@@ -82,3 +84,34 @@ jobs:
         run: |
           ${{ runner.temp }}/scanner/dotnet-sonarscanner end \
             /d:sonar.token="${SONAR_TOKEN}"
+
+  dependency-check:
+    name: OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    needs: build-and-analyze
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check
+          key: ${{ runner.os }}-dependency-check
+          restore-keys: |
+            ${{ runner.os }}-dependency-check
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "bp"
+          path: "."
+          format: "HTML"
+          out: "dependency-check-report"
+
+      - name: Upload Dependency-Check report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report
