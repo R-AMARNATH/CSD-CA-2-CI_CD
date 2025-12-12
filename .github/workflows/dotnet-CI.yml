@@ -70,12 +70,15 @@ jobs:
       - name: Build solution
         run: dotnet build --configuration Release
 
-      - name: Run tests with coverage (OpenCover)
+      - name: Test with coverage (non-E2E)
         run: |
           dotnet test \
             --configuration Release \
-            --collect:"XPlat Code Coverage" \
+            --no-build \
+            --collect "XPlat Code Coverage" \
             --results-directory TestResults \
+            --logger "trx" \
+            --filter "TestCategory!=E2E" \
             -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
       # PUBLISH  + ARTIFACT
@@ -150,5 +153,54 @@ jobs:
           slot-name: ${{ vars.STAGING_SLOT_NAME }}     
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_STAGING }}
           package: ./publish
+
+      - name: Debug URL after
+        run: echo "BASE_URL='$BASE_URL'"
+        env:
+          BASE_URL: ${{ vars.STAGING_URL }}
+
+
+  # 3) STAGING TESTS (E2E + k6 + ZAP)
+  
+  staging_tests:
+    needs: deploy_staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - name: Build E2E tests
+        working-directory: BP_E2E
+        run: dotnet build -c Release
+
+      # Cache Playwright browsers
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-cache
+          restore-keys: |
+            ${{ runner.os }}-playwright-cache
+
+      # Install Playwright browsers
+      - name: Install Playwright browsers
+        working-directory: BP_E2E
+        run: |
+          dotnet build -c Release
+          pwsh ./bin/Release/net9.0/playwright.ps1 install --with-deps
+
+      # Run E2E tests against staging URL
+      - name: Run Playwright E2E tests against Staging
+        working-directory: BP_E2E
+        env:
+          BASE_URL: ${{ vars.STAGING_URL }}
+        run: dotnet test -c Release --no-build --filter "Category=E2E"
           
 
