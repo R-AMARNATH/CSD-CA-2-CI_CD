@@ -78,6 +78,19 @@ jobs:
             --results-directory TestResults \
             -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
+      # PUBLISH  + ARTIFACT
+      - name: Ensure publish folder clean
+        run: rm -rf ./publish/* || true
+
+      - name: Publish Application
+        run: dotnet publish BPCalculator/BPCalculator.csproj -c Release -o ./publish
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bpapp
+          path: ./publish
+
       - name: End SonarCloud analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -115,3 +128,27 @@ jobs:
         with:
           name: dependency-check-report
           path: dependency-check-report
+
+  deploy_staging:
+    name: Deploy to Staging
+    needs: dependency-check
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bpapp
+          path: ./publish
+
+      - name: Deploy to Staging Slot
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.STAGING_APP_NAME }}          
+          slot-name: ${{ vars.STAGING_SLOT_NAME }}     
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_STAGING }}
+          package: ./publish
+          
+
