@@ -154,12 +154,6 @@ jobs:
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_STAGING }}
           package: ./publish
 
-      - name: Debug URL after
-        run: echo "BASE_URL='$BASE_URL'"
-        env:
-          BASE_URL: ${{ vars.STAGING_URL }}
-
-
   # 3) STAGING TESTS (E2E + k6 + ZAP)
   
   staging_tests:
@@ -202,5 +196,51 @@ jobs:
         env:
           BASE_URL: ${{ vars.STAGING_URL }}
         run: dotnet test -c Release --no-build --filter "Category=E2E"
+
+      # Install k6
+      - name: Install k6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg ca-certificates
+          curl https://dl.k6.io/key.gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      # Run k6 against staging
+      - name: Run k6 Performance Test against Staging
+        env:
+          BASE_URL: ${{ vars.STAGING_URL }}
+        run: |
+          k6 run k6Tests/performance.js | tee k6report.txt
+
+      - name: Upload k6 Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-performance-report
+          path: k6report.txt
+
+      # Prepare ZAP report dir
+      - name: Prepare ZAP report directory
+        run: |
+          mkdir -p zap-report
+          chmod 777 zap-report
+
+      # ZAP baseline against staging
+      - name: OWASP ZAP Baseline Scan (Docker vs Staging URL)
+        continue-on-error: true
+        env:
+          TARGET_URL: ${{ vars.STAGING_URL }}
+        run: |
+          docker run \
+            -v "$PWD/zap-report:/zap/wrk/:rw" \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t "$TARGET_URL" -r zap-report.html -a || true
+
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-report
           
 

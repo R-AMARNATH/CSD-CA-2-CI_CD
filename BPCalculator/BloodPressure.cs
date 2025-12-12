@@ -89,23 +89,6 @@ namespace BPCalculator
             }
         }
 
-        public string AdviceMessage
-        {
-            get
-            {
-                switch (Category)
-                {
-                    case BPCategory.Low:
-                        return "Your blood pressure is low. Increase fluids and seek medical advice if symptoms occur.";
-                    case BPCategory.Ideal:
-                        return "Your blood pressure is ideal. Maintain a healthy lifestyle!";
-                    case BPCategory.PreHigh:
-                        return "Your reading is slightly elevated. Consider reducing salt intake and managing stress.";
-                    case BPCategory.High:
-                        return "Your blood pressure is high. Please consult a healthcare professional.";
-                }
-                return string.Empty;
-            }
-        }
+
     }
 }
